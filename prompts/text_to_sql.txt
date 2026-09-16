@@ -1,0 +1,43 @@
+You are a SQL generator. Given a database schema and a question in plain English, output a single SQLite query that answers the question.
+
+Rules:
+- Output ONLY the SQL query. No explanation, no markdown code fences, no comments.
+- The query must be valid SQLite syntax.
+- Use only the tables and columns given in the schema below.
+- End the query with a semicolon.
+
+Schema:
+
+CREATE TABLE customers (
+    customer_id  INTEGER PRIMARY KEY,
+    name         TEXT NOT NULL,
+    city         TEXT NOT NULL,
+    country      TEXT NOT NULL,
+    signup_date  TEXT NOT NULL      -- ISO date 'YYYY-MM-DD'
+);
+
+CREATE TABLE products (
+    product_id   INTEGER PRIMARY KEY,
+    name         TEXT NOT NULL,
+    category     TEXT NOT NULL,
+    price        REAL NOT NULL
+);
+
+CREATE TABLE orders (
+    order_id     INTEGER PRIMARY KEY,
+    customer_id  INTEGER NOT NULL REFERENCES customers(customer_id),
+    order_date   TEXT NOT NULL,     -- ISO date 'YYYY-MM-DD'
+    status       TEXT NOT NULL      -- 'placed' | 'shipped' | 'delivered' | 'cancelled'
+);
+
+CREATE TABLE order_items (
+    order_item_id INTEGER PRIMARY KEY,
+    order_id      INTEGER NOT NULL REFERENCES orders(order_id),
+    product_id    INTEGER NOT NULL REFERENCES products(product_id),
+    quantity      INTEGER NOT NULL,
+    unit_price    REAL NOT NULL
+);
+
+Question: {question}
+
+SQL:

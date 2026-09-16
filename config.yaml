@@ -1,0 +1,36 @@
+# Bake-off configuration.
+# Fill in / adjust model names and pricing before running.
+# Pricing changes over time -- verify current $/1M tokens on the provider's
+# pricing page before you compute cost.csv, don't trust old numbers blindly.
+
+models:
+  top_api:
+    label: "claude-opus-5"          # the top API model
+    provider: anthropic
+    model_id: "claude-opus-5"
+    price_per_m_input: 15.00        # USD per 1M input tokens -- VERIFY before final run
+    price_per_m_output: 75.00       # USD per 1M output tokens -- VERIFY before final run
+
+  cheap_api:
+    label: "claude-haiku-4-5"       # the cheap/fast API model
+    provider: anthropic
+    model_id: "claude-haiku-4-5-20251001"
+    price_per_m_input: 1.00         # USD per 1M input tokens -- VERIFY before final run
+    price_per_m_output: 5.00        # USD per 1M output tokens -- VERIFY before final run
+
+  local_oss:
+    label: "qwen2.5:3b"             # change to whatever you've pulled with `ollama pull`
+    provider: ollama
+    model_id: "qwen2.5:3b"
+    ollama_host: "http://localhost:11434"
+    # local cost is computed from hardware, not token pricing -- see cost.py
+
+run:
+  temperature: 0
+  max_tokens: 300
+  n_repeats_for_latency: 1   # set >1 if you want to re-run all 50 items multiple times for tighter p50/p95
+
+local_hardware:
+  # Fill these in with your actual machine, used by cost.py to estimate $/1k requests
+  description: "e.g. M2 MacBook Air, 16GB RAM"
+  hourly_cost_usd: 0.00      # if you own the hardware, estimate amortized $/hour (electricity + depreciation), or 0 to report token/sec only
