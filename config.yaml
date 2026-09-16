@@ -5,21 +5,23 @@
 
 models:
   top_api:
-    label: "claude-opus-5"          # the top API model
-    provider: anthropic
-    model_id: "claude-opus-5"
-    price_per_m_input: 15.00        # USD per 1M input tokens -- VERIFY before final run
-    price_per_m_output: 75.00       # USD per 1M output tokens -- VERIFY before final run
+    label: "openai/gpt-oss-120b"    # free-tier stand-in for the top API model (via Groq)
+    provider: free_api
+    free_provider: groq
+    model_id: "openai/gpt-oss-120b"
+    price_per_m_input: 0.00
+    price_per_m_output: 0.00
 
   cheap_api:
-    label: "claude-haiku-4-5"       # the cheap/fast API model
-    provider: anthropic
-    model_id: "claude-haiku-4-5-20251001"
-    price_per_m_input: 1.00         # USD per 1M input tokens -- VERIFY before final run
-    price_per_m_output: 5.00        # USD per 1M output tokens -- VERIFY before final run
+    label: "openai/gpt-oss-20b"     # smaller/faster Groq model, distinct from top_api
+    provider: free_api
+    free_provider: groq
+    model_id: "openai/gpt-oss-20b"
+    price_per_m_input: 0.00
+    price_per_m_output: 0.00
 
   local_oss:
-    label: "qwen2.5:3b"             # change to whatever you've pulled with `ollama pull`
+    label: "qwen2.5:3b"
     provider: ollama
     model_id: "qwen2.5:3b"
     ollama_host: "http://localhost:11434"
@@ -28,9 +30,8 @@ models:
 run:
   temperature: 0
   max_tokens: 300
-  n_repeats_for_latency: 1   # set >1 if you want to re-run all 50 items multiple times for tighter p50/p95
+  n_repeats_for_latency: 1
 
 local_hardware:
-  # Fill these in with your actual machine, used by cost.py to estimate $/1k requests
   description: "e.g. M2 MacBook Air, 16GB RAM"
-  hourly_cost_usd: 0.00      # if you own the hardware, estimate amortized $/hour (electricity + depreciation), or 0 to report token/sec only
+  hourly_cost_usd: 0.00

@@ -9,9 +9,12 @@ Usage:
     python src/run.py --model cheap_api
     python src/run.py --model local_oss
 
-Requires ANTHROPIC_API_KEY in the environment for the two API models.
-For local_oss, requires Ollama running (`ollama serve`) with the model
-already pulled (`ollama pull qwen2.5:3b` or whatever config.yaml names).
+Requires ANTHROPIC_API_KEY in the environment for any model configured with
+provider: anthropic. For provider: free_api (Gemini / Groq / OpenRouter),
+requires the matching key (GEMINI_API_KEY / GROQ_API_KEY / OPENROUTER_API_KEY)
+in .env -- see free_providers.py. For local_oss, requires Ollama running
+(`ollama serve`) with the model already pulled (`ollama pull qwen2.5:3b` or
+whatever config.yaml names).
 """
 import argparse
 import json
@@ -21,6 +24,7 @@ import sys
 
 import yaml
 import requests
+from free_providers import call_free_model
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
@@ -82,6 +86,38 @@ def call_anthropic(model_id: str, prompt: str, temperature: float, max_tokens: i
     }
 
 
+def call_free_api(free_provider: str, model_id: str, prompt: str, temperature: float, max_tokens: int):
+    """
+    Calls a free-tier model (Gemini / Groq / OpenRouter) via free_providers.py.
+    free_provider is the provider key ("gemini" / "groq" / "openrouter"),
+    model_id is that provider's model name (e.g. "gemini-flash-latest",
+    "openai/gpt-oss-120b", "meta-llama/llama-3.3-70b-instruct:free").
+    max_tokens is currently unused here since call_free_model doesn't cap
+    output length itself -- if you need a hard cap, add max_tokens support
+    to free_providers.call_free_model and pass it through.
+    """
+    t0 = time.perf_counter()
+    try:
+        text, usage, _ = call_free_model(free_provider, model_id, prompt, temperature=temperature)
+    except Exception as e:
+        latency_ms = (time.perf_counter() - t0) * 1000
+        return {
+            "raw_output": "",
+            "latency_ms": latency_ms,
+            "input_tokens": None,
+            "output_tokens": None,
+            "error": str(e),
+        }
+    latency_ms = (time.perf_counter() - t0) * 1000
+    return {
+        "raw_output": text,
+        "latency_ms": latency_ms,
+        "input_tokens": usage.get("prompt_tokens"),
+        "output_tokens": usage.get("completion_tokens"),
+        "error": None,
+    }
+
+
 def call_ollama(model_id: str, host: str, prompt: str, temperature: float, max_tokens: int):
     t0 = time.perf_counter()
     try:
@@ -124,6 +160,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, choices=["top_api", "cheap_api", "local_oss"])
     parser.add_argument("--limit", type=int, default=None, help="only run first N items (for a quick test)")
+    parser.add_argument(
+        "--delay", type=float, default=None,
+        help="seconds to sleep between items (helps stay under free-tier rate limits, "
+             "e.g. Gemini's free tier is 20 requests/minute -> use --delay 3.5 or more)",
+    )
     args = parser.parse_args()
 
     config = load_config()
@@ -148,6 +189,11 @@ def main():
                 model_cfg["model_id"], prompt,
                 run_cfg["temperature"], run_cfg["max_tokens"],
             )
+        elif model_cfg["provider"] == "free_api":
+            out = call_free_api(
+                model_cfg["free_provider"], model_cfg["model_id"], prompt,
+                run_cfg["temperature"], run_cfg["max_tokens"],
+            )
         elif model_cfg["provider"] == "ollama":
             out = call_ollama(
                 model_cfg["model_id"], model_cfg["ollama_host"], prompt,
@@ -169,6 +215,9 @@ def main():
         results.append(out)
         status = "OK" if out["error"] is None else f"ERROR: {out['error']}"
         print(f"  [{i}/{len(items)}] item {item['id']} ({item['difficulty']}) - {status} - {out['latency_ms']:.0f}ms")
+
+        if args.delay and i < len(items):
+            time.sleep(args.delay)
 
     with open(out_path, "w") as f:
         for r in results:

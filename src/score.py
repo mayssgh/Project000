@@ -18,8 +18,8 @@ import argparse
 import csv
 import json
 import os
-import signal
 import sqlite3
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
@@ -34,10 +34,6 @@ class Timeout(Exception):
     pass
 
 
-def _handler(signum, frame):
-    raise Timeout()
-
-
 def _normalize_rows(rows):
     out = []
     for row in rows:
@@ -50,19 +46,28 @@ def _normalize_rows(rows):
 
 
 def run_query(conn, sql, timeout=QUERY_TIMEOUT_SECONDS):
+    """
+    Cross-platform query timeout: SIGALRM only exists on Unix, so on Windows
+    (and to be safe, everywhere) we use a threading.Timer that calls
+    conn.interrupt() after `timeout` seconds. interrupt() causes the running
+    query to raise sqlite3.OperationalError("interrupted") from inside
+    cur.execute(), which we catch and treat as a timeout.
+    """
     cur = conn.cursor()
-    signal.signal(signal.SIGALRM, _handler)
-    signal.alarm(timeout)
+    timer = threading.Timer(timeout, conn.interrupt)
+    timer.start()
     try:
         cur.execute(sql)
         rows = cur.fetchall()
         return rows, None
-    except Timeout:
-        return None, "timeout"
+    except sqlite3.OperationalError as e:
+        if "interrupted" in str(e).lower():
+            return None, "timeout"
+        return None, f"sql_error: {e}"
     except sqlite3.Error as e:
         return None, f"sql_error: {e}"
     finally:
-        signal.alarm(0)
+        timer.cancel()
 
 
 def score_item(conn, predicted_sql, gold_sql):
